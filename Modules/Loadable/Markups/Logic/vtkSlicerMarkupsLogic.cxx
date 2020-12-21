@@ -198,12 +198,19 @@ void vtkSlicerMarkupsLogic::ObserveMRMLScene()
     // bar is triggered when leave it
     this->GetMRMLScene()->StartState(vtkMRMLScene::BatchProcessState);
 
-    selectionNode->AddNewPlaceNodeClassNameToList("vtkMRMLMarkupsFiducialNode", ":/Icons/MarkupsMouseModePlace.png", "Fiducial");
-    selectionNode->AddNewPlaceNodeClassNameToList("vtkMRMLMarkupsLineNode", ":/Icons/MarkupsLineMouseModePlace.png", "Line");
-    selectionNode->AddNewPlaceNodeClassNameToList("vtkMRMLMarkupsAngleNode", ":/Icons/MarkupsAngleMouseModePlace.png", "Angle");
-    selectionNode->AddNewPlaceNodeClassNameToList("vtkMRMLMarkupsCurveNode", ":/Icons/MarkupsCurveMouseModePlace.png", "Open Curve");
-    selectionNode->AddNewPlaceNodeClassNameToList("vtkMRMLMarkupsClosedCurveNode", ":/Icons/MarkupsClosedCurveMouseModePlace.png", "Closed Curve");
-    selectionNode->AddNewPlaceNodeClassNameToList("vtkMRMLMarkupsPlaneNode", ":/Icons/MarkupsPlaneMouseModePlace.png", "Plane");
+    auto fiducialNode = vtkSmartPointer<vtkMRMLMarkupsFiducialNode>::New();
+    auto lineNode = vtkSmartPointer<vtkMRMLMarkupsLineNode>::New();
+    auto angleNode = vtkSmartPointer<vtkMRMLMarkupsAngleNode>::New();
+    auto curveNode = vtkSmartPointer<vtkMRMLMarkupsCurveNode>::New();
+    auto closedCurveNode = vtkSmartPointer<vtkMRMLMarkupsClosedCurveNode>::New();
+    auto planeNode = vtkSmartPointer<vtkMRMLMarkupsPlaneNode>::New();
+
+    selectionNode->AddNewPlaceNodeClassNameToList(fiducialNode->GetClassName(), fiducialNode->GetPlacementIcon(), fiducialNode->GetMarkupName());
+    selectionNode->AddNewPlaceNodeClassNameToList(lineNode->GetClassName(), lineNode->GetPlacementIcon(), lineNode->GetMarkupName());
+    selectionNode->AddNewPlaceNodeClassNameToList(angleNode->GetClassName(), angleNode->GetPlacementIcon(), angleNode->GetMarkupName());
+    selectionNode->AddNewPlaceNodeClassNameToList(curveNode->GetClassName(), curveNode->GetPlacementIcon(), curveNode->GetMarkupName());
+    selectionNode->AddNewPlaceNodeClassNameToList(closedCurveNode->GetClassName(), closedCurveNode->GetPlacementIcon(), closedCurveNode->GetMarkupName());
+    selectionNode->AddNewPlaceNodeClassNameToList(planeNode->GetClassName(), planeNode->GetPlacementIcon(), planeNode->GetMarkupName());
 
     // trigger an update on the mouse mode toolbar
     this->GetMRMLScene()->EndState(vtkMRMLScene::BatchProcessState);

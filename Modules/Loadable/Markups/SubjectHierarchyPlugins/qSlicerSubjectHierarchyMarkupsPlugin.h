@@ -28,6 +28,11 @@
 
 #include "qSlicerMarkupsSubjectHierarchyPluginsExport.h"
 
+#include <string>
+#include <map>
+
+class vtkMRMLMarkupsNode;
+
 class qSlicerSubjectHierarchyMarkupsPluginPrivate;
 
 /// \ingroup Slicer_QtModules_SubjectHierarchy_Plugins
@@ -42,6 +47,7 @@ public:
   ~qSlicerSubjectHierarchyMarkupsPlugin() override;
 
 public:
+
   /// Determines if a data node can be placed in the hierarchy using the actual plugin,
   /// and gets a confidence value for a certain MRML node (usually the type and possibly attributes are checked).
   /// \param node Node to be added to the hierarchy
@@ -110,6 +116,9 @@ protected slots:
 
 protected:
   QScopedPointer<qSlicerSubjectHierarchyMarkupsPluginPrivate> d_ptr;
+
+  // Contains registered markup nodes and corresponding icon images
+  std::map<std::string, std::string> RegisteredMarkups;
 
 private:
   Q_DECLARE_PRIVATE(qSlicerSubjectHierarchyMarkupsPlugin);

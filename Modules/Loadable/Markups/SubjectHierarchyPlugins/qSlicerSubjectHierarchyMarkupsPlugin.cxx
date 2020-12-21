@@ -33,6 +33,13 @@
 #include "qSlicerTerminologyItemDelegate.h"
 #include "vtkSlicerTerminologiesModuleLogic.h"
 
+#include "vtkMRMLMarkupsFiducialNode.h"
+#include "vtkMRMLMarkupsLineNode.h"
+#include "vtkMRMLMarkupsAngleNode.h"
+#include "vtkMRMLMarkupsCurveNode.h"
+#include "vtkMRMLMarkupsClosedCurveNode.h"
+#include "vtkMRMLMarkupsPlaneNode.h"
+
 // MRML widgets includes
 #include "qMRMLNodeComboBox.h"
 
@@ -42,6 +49,7 @@
 #include <vtkMRMLMarkupsDisplayNode.h>
 #include <vtkMRMLMarkupsNode.h>
 #include <vtkMRMLScene.h>
+#include <vtkMRMLMarkupsRegistrationFactory.h>
 
 // vtkSegmentationCore includes
 #include <vtkSegment.h>
@@ -136,7 +144,7 @@ qSlicerSubjectHierarchyMarkupsPlugin::qSlicerSubjectHierarchyMarkupsPlugin(QObje
 //-----------------------------------------------------------------------------
 qSlicerSubjectHierarchyMarkupsPlugin::~qSlicerSubjectHierarchyMarkupsPlugin() = default;
 
-//----------------------------------------------------------------------------
+//-----------------------------------------------------------------------------
 double qSlicerSubjectHierarchyMarkupsPlugin::canAddNodeToSubjectHierarchy(
   vtkMRMLNode* node, vtkIdType parentItemID/*=vtkMRMLSubjectHierarchyNode::INVALID_ITEM_ID*/)const
 {
@@ -146,17 +154,17 @@ double qSlicerSubjectHierarchyMarkupsPlugin::canAddNodeToSubjectHierarchy(
     qCritical() << Q_FUNC_INFO << ": Input node is NULL";
     return 0.0;
     }
-  else if (node->IsA("vtkMRMLMarkupsFiducialNode") ||
-           node->IsA("vtkMRMLMarkupsLineNode") ||
-           node->IsA("vtkMRMLMarkupsAngleNode") ||
-           node->IsA("vtkMRMLMarkupsCurveNode") ||
-           node->IsA("vtkMRMLMarkupsClosedCurveNode") ||
-           node->IsA("vtkMRMLMarkupsPlaneNode")
-           )
+
+  bool registered =
+    vtkMRMLMarkupsRegistrationFactory::GetInstance()->IsRegistered(node->GetClassName());
+
+  if (registered)
     {
-    // Item is a markup
+    // Item is a registered markup
     return 0.5;
     }
+
+  // Item is not a registered markup
   return 0.0;
 }
 
@@ -177,19 +185,18 @@ double qSlicerSubjectHierarchyMarkupsPlugin::canOwnSubjectHierarchyItem(vtkIdTyp
 
   // Markup
   vtkMRMLNode* associatedNode = shNode->GetItemDataNode(itemID);
-  if (associatedNode &&
-      (associatedNode->IsA("vtkMRMLMarkupsFiducialNode") ||
-       associatedNode->IsA("vtkMRMLMarkupsLineNode") ||
-       associatedNode->IsA("vtkMRMLMarkupsAngleNode") ||
-       associatedNode->IsA("vtkMRMLMarkupsCurveNode") ||
-       associatedNode->IsA("vtkMRMLMarkupsClosedCurveNode") ||
-       associatedNode->IsA("vtkMRMLMarkupsPlaneNode"))
-    )
+  if (associatedNode)
     {
-    // Item is a markup
-    return 0.5;
+    bool registered =
+      vtkMRMLMarkupsRegistrationFactory::GetInstance()->IsRegistered(associatedNode->GetClassName());
+    if (registered)
+      {
+      // Item is a registered markup
+      return 0.5;
+      }
     }
 
+  // Item is not a registered markup
   return 0.0;
 }
 
@@ -225,32 +232,14 @@ QIcon qSlicerSubjectHierarchyMarkupsPlugin::icon(vtkIdType itemID)
     {
     return QIcon();
     }
-  if (node->IsA("vtkMRMLMarkupsFiducialNode"))
+
+  vtkMRMLMarkupsNode *markupsNode = vtkMRMLMarkupsNode::SafeDownCast(node);
+  if (markupsNode == nullptr)
     {
-    return QIcon(":Icons/MarkupsFiducial.png");
+    return QIcon();
     }
-  else if (node->IsA("vtkMRMLMarkupsLineNode"))
-    {
-    return QIcon(":Icons/MarkupsLine.png");
-    }
-  else if (node->IsA("vtkMRMLMarkupsAngleNode"))
-    {
-    return QIcon(":Icons/MarkupsAngle.png");
-    }
-  else if (node->IsA("vtkMRMLMarkupsClosedCurveNode"))
-    {
-    // closed curve is a child class of curve node,
-    return QIcon(":Icons/MarkupsClosedCurve.png");
-    }
-  else if (node->IsA("vtkMRMLMarkupsCurveNode"))
-    {
-    return QIcon(":Icons/MarkupsOpenCurve.png");
-    }
-  else if (node->IsA("vtkMRMLMarkupsPlaneNode"))
-    {
-    return QIcon(":Icons/MarkupsPlane.png");
-    }
-  return QIcon();
+
+  return QIcon(markupsNode->GetIcon());
 }
 
 //---------------------------------------------------------------------------

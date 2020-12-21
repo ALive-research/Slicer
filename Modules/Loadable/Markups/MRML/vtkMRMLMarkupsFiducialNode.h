@@ -44,14 +44,22 @@ public:
   void PrintSelf(ostream& os, vtkIndent indent) override;
 
   const char* GetIcon() override {return ":/Icons/MarkupsMouseModePlace.png";}
+  const char* GetAddIcon() override {return ":/Icons/MarkupsMouseModePlaceAdd.png";}
 
   //--------------------------------------------------------------------------
   // MRMLNode methods
   //--------------------------------------------------------------------------
 
   vtkMRMLNode* CreateNodeInstance() override;
+
   /// Get node XML tag name (like Volume, Model)
   const char* GetNodeTagName() override {return "MarkupsFiducial";}
+
+  /// Get markup name
+  const char* GetMarkupName() override {return "Fiducial";};
+
+  /// Get markup short name
+  const char* GetMarkupShortName() override {return "F";};
 
   /// Read node attributes from XML file
   void ReadXMLAttributes( const char** atts) override;

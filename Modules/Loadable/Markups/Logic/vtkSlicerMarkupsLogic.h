@@ -27,10 +27,12 @@
 // Slicer includes
 #include "vtkSlicerModuleLogic.h"
 
-// MRML includes
+// Widgets includes
+#include "vtkSlicerMarkupsWidget.h"
 
 // STD includes
 #include <cstdlib>
+#include <string>
 
 #include "vtkSlicerMarkupsModuleLogicExport.h"
 
@@ -243,6 +245,20 @@ public:
   void RegisterJsonStorageNodeForMarkupsType(std::string markupsType, std::string storageNodeClassName);
   vtkMRMLMarkupsJsonStorageNode* AddNewJsonStorageNodeForMarkupsType(std::string markupsType);
 
+  /// Registers a markup and its corresponding widget to be handled by the Markups module
+  /// For a markup to be handled by this module (processed by the displayable
+  /// manager, UI and subject hierarchy) it needs to be registered using this function.
+  /// \param markupsNode MRMLMarkups node to be registered.
+  /// \param markupsWidget vtkSlicerWidget associated to the MRMLMarkups node registered.
+  void RegisterMarkup(vtkMRMLMarkupsNode *markupsNode, vtkSlicerMarkupsWidget* markupsWidget);
+
+  /// This returns an isntance to a corresponding vtkSlicerMarkupsWidget associated
+  /// to the MRML node class specified.
+  /// \param nodeClass registered class to retrieve the associated widget.
+  /// \return pointer to associated vtkSLicerMarkupsWidget or nullptr if the MRML node
+  /// class is not registered.
+  vtkSlicerMarkupsWidget* GetWidgetByMarkupsNodeClass(const char* className) const;
+
 protected:
   vtkSlicerMarkupsLogic();
   ~vtkSlicerMarkupsLogic() override;
@@ -260,6 +276,9 @@ protected:
 
   std::map<std::string, std::string> MarkupsTypeStorageNodes;
   vtkMRMLSelectionNode* SelectionNode{nullptr};
+
+  // Keeps track of the registered nodes and corresponding widgets
+  std::map<std::string, vtkSmartPointer<vtkSlicerMarkupsWidget>> MarkupsWidgetsMap;
 
 private:
 

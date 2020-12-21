@@ -68,6 +68,23 @@ void vtkSlicerCurveWidget::CreateDefaultRepresentation(
 }
 
 //----------------------------------------------------------------------
+vtkSlicerMarkupsWidget* vtkSlicerCurveWidget::CreateInstance() const
+{
+  vtkObject* ret = vtkObjectFactory::CreateInstance("vtkSlicerCurveWidget");
+  if(ret)
+    {
+    return static_cast<vtkSlicerCurveWidget*>(ret);
+    }
+
+  vtkSlicerCurveWidget* result = new vtkSlicerCurveWidget;
+#ifdef VTK_HAS_INITIALIZE_OBJECT_BASE
+  result->InitializeObjectBase();
+#endif
+  return result;
+}
+
+
+//----------------------------------------------------------------------
 bool vtkSlicerCurveWidget::ProcessControlPointInsert(vtkMRMLInteractionEventData* eventData)
 {
   vtkMRMLMarkupsCurveNode* markupsNode = this->GetMarkupsCurveNode();

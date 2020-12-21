@@ -45,6 +45,22 @@ vtkSlicerPlaneWidget::vtkSlicerPlaneWidget()
 vtkSlicerPlaneWidget::~vtkSlicerPlaneWidget() = default;
 
 //----------------------------------------------------------------------
+vtkSlicerMarkupsWidget* vtkSlicerPlaneWidget::CreateInstance() const
+{
+  vtkObject* ret = vtkObjectFactory::CreateInstance("vtkSlicerPlaneWidget");
+  if(ret)
+    {
+    return static_cast<vtkSlicerPlaneWidget*>(ret);
+    }
+
+  vtkSlicerPlaneWidget* result = new vtkSlicerPlaneWidget;
+#ifdef VTK_HAS_INITIALIZE_OBJECT_BASE
+  result->InitializeObjectBase();
+#endif
+  return result;
+}
+
+//----------------------------------------------------------------------
 void vtkSlicerPlaneWidget::CreateDefaultRepresentation(
   vtkMRMLMarkupsDisplayNode* markupsDisplayNode, vtkMRMLAbstractViewNode* viewNode, vtkRenderer* renderer)
 {

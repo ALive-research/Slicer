@@ -48,6 +48,22 @@ vtkSlicerROIWidget::vtkSlicerROIWidget()
 vtkSlicerROIWidget::~vtkSlicerROIWidget() = default;
 
 //----------------------------------------------------------------------
+vtkSlicerMarkupsWidget* vtkSlicerROIWidget::CreateInstance() const
+{
+  vtkObject* ret = vtkObjectFactory::CreateInstance("vtkSlicerROIWidget");
+  if(ret)
+    {
+    return static_cast<vtkSlicerROIWidget*>(ret);
+    }
+
+  vtkSlicerROIWidget* result = new vtkSlicerROIWidget;
+#ifdef VTK_HAS_INITIALIZE_OBJECT_BASE
+  result->InitializeObjectBase();
+#endif
+  return result;
+}
+
+//----------------------------------------------------------------------
 void vtkSlicerROIWidget::CreateDefaultRepresentation(
   vtkMRMLMarkupsDisplayNode* markupsDisplayNode, vtkMRMLAbstractViewNode* viewNode, vtkRenderer* renderer)
 {

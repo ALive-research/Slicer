@@ -44,6 +44,19 @@
 //#include "qSlicerMarkupsSettingsPanel.h"
 //#include "vtkSlicerMarkupsLogic.h"
 #include "vtkMRMLMarkupsDisplayNode.h"
+#include "vtkMRMLMarkupsClosedCurveNode.h"
+#include "vtkMRMLMarkupsCurveNode.h"
+#include "vtkMRMLMarkupsDisplayNode.h"
+#include "vtkMRMLMarkupsFiducialNode.h"
+#include "vtkMRMLMarkupsLineNode.h"
+#include "vtkMRMLMarkupsPlaneNode.h"
+#include "vtkMRMLMarkupsAngleNode.h"
+#include "vtkSlicerLineWidget.h"
+#include "vtkSlicerClosedCurveWidget.h"
+#include "vtkSlicerCurveWidget.h"
+#include "vtkSlicerAngleWidget.h"
+#include "vtkSlicerPlaneWidget.h"
+#include "vtkSlicerPointsWidget.h"
 
 // DisplayableManager initialization
 #include <vtkAutoInit.h>
@@ -118,6 +131,20 @@ QIcon qSlicerMarkupsModule::icon()const
 void qSlicerMarkupsModule::setup()
 {
   this->Superclass::setup();
+
+  vtkSlicerMarkupsLogic *logic = vtkSlicerMarkupsLogic::SafeDownCast(this->logic());
+  if (!logic)
+    {
+    qCritical() << Q_FUNC_INFO << ": cannot get Markups logic.";
+    return;
+    }
+  logic->RegisterMarkup(vtkMRMLMarkupsAngleNode::New(), vtkSlicerAngleWidget::New());
+  logic->RegisterMarkup(vtkMRMLMarkupsFiducialNode::New(), vtkSlicerPointsWidget::New());
+  logic->RegisterMarkup(vtkMRMLMarkupsLineNode::New(), vtkSlicerLineWidget::New());
+  logic->RegisterMarkup(vtkMRMLMarkupsCurveNode::New(), vtkSlicerCurveWidget::New());
+  logic->RegisterMarkup(vtkMRMLMarkupsClosedCurveNode::New(), vtkSlicerClosedCurveWidget::New());
+  logic->RegisterMarkup(vtkMRMLMarkupsPlaneNode::New(), vtkSlicerPlaneWidget::New());
+
 
   // Register displayable managers (same displayable manager handles both slice and 3D views)
   vtkMRMLSliceViewDisplayableManagerFactory::GetInstance()->RegisterDisplayableManager("vtkMRMLMarkupsDisplayableManager");

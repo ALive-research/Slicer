@@ -222,7 +222,7 @@ void vtkSlicerMarkupsLogic::ObserveMRMLScene()
     selectionNode->AddNewPlaceNodeClassNameToList("vtkMRMLMarkupsCurveNode", ":/Icons/MarkupsCurveMouseModePlace.png", "Open Curve");
     selectionNode->AddNewPlaceNodeClassNameToList("vtkMRMLMarkupsClosedCurveNode", ":/Icons/MarkupsClosedCurveMouseModePlace.png", "Closed Curve");
     selectionNode->AddNewPlaceNodeClassNameToList("vtkMRMLMarkupsPlaneNode", ":/Icons/MarkupsPlaneMouseModePlace.png", "Plane");
-    selectionNode->AddNewPlaceNodeClassNameToList("vtkMRMLMarkupsROINode", ":/Icons/MarkupsROIModePlace.png", "ROI");
+    selectionNode->AddNewPlaceNodeClassNameToList("vtkMRMLMarkupsROINode", ":/Icons/MarkupsROIMouseModePlace.png", "ROI");
 
     // trigger an update on the mouse mode toolbar
     this->GetMRMLScene()->EndState(vtkMRMLScene::BatchProcessState);
@@ -1560,4 +1560,51 @@ std::string vtkSlicerMarkupsLogic::GetJsonStorageNodeClassNameForMarkupsType(std
 vtkMRMLMarkupsJsonStorageNode* vtkSlicerMarkupsLogic::AddNewJsonStorageNodeForMarkupsType(std::string markupsType)
 {
   return vtkMRMLMarkupsJsonStorageNode::SafeDownCast(this->GetMRMLScene()->AddNewNodeByClass(this->GetJsonStorageNodeClassNameForMarkupsType(markupsType)));
+}
+
+//---------------------------------------------------------------------------
+void vtkSlicerMarkupsLogic::RegisterMarkup(vtkMRMLMarkupsNode *markupsNode,
+                                           vtkSlicerMarkupsWidget* markupsWidget)
+{
+  if (markupsNode == nullptr)
+    {
+    vtkErrorMacro("RegisterMarkup: Invalid node.");
+    return;
+    }
+
+  if (markupsWidget == nullptr)
+    {
+    vtkErrorMacro("RegisterMarkup: Invalid widget.");
+    return;
+    }
+
+  // Take ownership of widget regardless of the outcome of this function (we will
+  // manage the memory).
+  vtkSmartPointer<vtkMRMLNode> node =
+    vtkSmartPointer<vtkMRMLNode>::Take(markupsNode);
+
+  vtkSmartPointer<vtkSlicerMarkupsWidget> associatedWidget =
+    vtkSmartPointer<vtkSlicerMarkupsWidget>::Take(markupsWidget);
+
+  // Check that the class is not already registered
+  if (this->MarkupsWidgetsMap.count(markupsNode->GetClassName()))
+    {
+    vtkWarningMacro("RegisterMarkup: Markups node " << markupsNode->GetClassName() <<
+                    " is already registered.");
+    return;
+    }
+
+  this->MarkupsWidgetsMap[markupsNode->GetClassName()] = associatedWidget;
+}
+
+//----------------------------------------------------------------------------
+vtkSlicerMarkupsWidget* vtkSlicerMarkupsLogic::GetWidgetByMarkupsNodeClass(const char* markupClass) const
+{
+  auto search = this->MarkupsWidgetsMap.find(markupClass);
+  if (search != this->MarkupsWidgetsMap.end())
+    {
+    return search->second;
+    }
+
+  return nullptr;
 }

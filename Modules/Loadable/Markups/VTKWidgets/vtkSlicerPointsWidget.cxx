@@ -50,3 +50,19 @@ void vtkSlicerPointsWidget::CreateDefaultRepresentation(
   rep->SetMarkupsDisplayNode(markupsDisplayNode);
   rep->UpdateFromMRML(nullptr, 0); // full update
 }
+
+//----------------------------------------------------------------------
+vtkSlicerMarkupsWidget* vtkSlicerPointsWidget::CreateInstance() const
+{
+  vtkObject* ret = vtkObjectFactory::CreateInstance("vtkSlicerPointsWidget");
+  if(ret)
+    {
+    return static_cast<vtkSlicerPointsWidget*>(ret);
+    }
+
+  vtkSlicerPointsWidget* result = new vtkSlicerPointsWidget;
+#ifdef VTK_HAS_INITIALIZE_OBJECT_BASE
+  result->InitializeObjectBase();
+#endif
+  return result;
+}

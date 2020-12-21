@@ -8,6 +8,8 @@ set(${KIT}_EXPORT_DIRECTIVE "VTK_SLICER_${MODULE_NAME_UPPER}_MODULE_MRML_EXPORT"
 
 set(${KIT}_INCLUDE_DIRECTORIES
   ${RapidJSON_INCLUDE_DIR}
+  ${vtkSlicer${MODULE_NAME}ModuleVTKWidgets_SOURCE_DIR}
+  ${vtkSlicer${MODULE_NAME}ModuleVTKWidgets_BINARY_DIR}
   )
 
 set(${KIT}_SRCS
@@ -22,6 +24,7 @@ set(${KIT}_SRCS
   vtkMRML${MODULE_NAME}Node.cxx
   vtkMRML${MODULE_NAME}FiducialStorageNode.cxx
   vtkMRML${MODULE_NAME}JsonStorageNode.cxx
+  vtkMRMLMarkupsRegistrationFactory.cxx
   vtkCurveGenerator.cxx
   vtkCurveGenerator.h
   vtkCurveMeasurementsCalculator.cxx

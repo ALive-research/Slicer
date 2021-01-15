@@ -18,6 +18,12 @@ set(${KIT}_SRCS
   qMRML${MODULE_NAME}InteractionHandleWidget.h
   qMRML${MODULE_NAME}ROIWidget.cxx
   qMRML${MODULE_NAME}ROIWidget.h
+  qSlicerMarkupsAdditionalWidget.cxx
+  qSlicerMarkupsAdditionalWidget.h
+  qSlicerMarkupsAngleMeasurementsWidget.h
+  qSlicerMarkupsAngleMeasurementsWidget.cxx
+  qSlicerMarkupsCurveSettingsWidget.h
+  qSlicerMarkupsCurveSettingsWidget.cxx
   qSlicerMarkupsPlaceWidget.cxx
   qSlicerMarkupsPlaceWidget.h
   qSlicerSimpleMarkupsWidget.cxx
@@ -29,6 +35,9 @@ set(${KIT}_MOC_SRCS
   qMRML${MODULE_NAME}FiducialProjectionPropertyWidget.h
   qMRML${MODULE_NAME}InteractionHandleWidget.h
   qMRML${MODULE_NAME}ROIWidget.h
+  qSlicerMarkupsAdditionalWidget.h
+  qSlicerMarkupsAngleMeasurementsWidget.h
+  qSlicerMarkupsCurveSettingsWidget.h
   qSlicerMarkupsPlaceWidget.h
   qSlicerSimpleMarkupsWidget.h
   )
@@ -38,6 +47,8 @@ set(${KIT}_UI_SRCS
   Resources/UI/qMRML${MODULE_NAME}FiducialProjectionPropertyWidget.ui
   Resources/UI/qMRML${MODULE_NAME}InteractionHandleWidget.ui
   Resources/UI/qMRML${MODULE_NAME}ROIWidget.ui
+  Resources/UI/qSlicerMarkupsAngleMeasurementsWidget.ui
+  Resources/UI/qSlicerMarkupsCurveSettingsWidget.ui
   Resources/UI/qSlicerMarkupsPlaceWidget.ui
   Resources/UI/qSlicerSimpleMarkupsWidget.ui
   )

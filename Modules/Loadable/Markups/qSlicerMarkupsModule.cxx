@@ -37,26 +37,28 @@
 #include "qSlicerSubjectHierarchyMarkupsPlugin.h"
 
 // Markups includes
+#include "qMRMLMarkupsROIWidget.h"
+#include "qSlicerMarkupsAngleMeasurementsWidget.h"
+#include "qSlicerMarkupsCurveSettingsWidget.h"
 #include "qSlicerMarkupsModule.h"
 #include "qSlicerMarkupsModuleWidget.h"
 #include "qSlicerMarkupsReader.h"
 #include "qSlicerMarkupsWriter.h"
-//#include "qSlicerMarkupsSettingsPanel.h"
-//#include "vtkSlicerMarkupsLogic.h"
+#include "vtkMRMLMarkupsAngleNode.h"
 #include "vtkMRMLMarkupsDisplayNode.h"
 #include "vtkMRMLMarkupsClosedCurveNode.h"
 #include "vtkMRMLMarkupsCurveNode.h"
-#include "vtkMRMLMarkupsDisplayNode.h"
 #include "vtkMRMLMarkupsFiducialNode.h"
 #include "vtkMRMLMarkupsLineNode.h"
 #include "vtkMRMLMarkupsPlaneNode.h"
-#include "vtkMRMLMarkupsAngleNode.h"
-#include "vtkSlicerLineWidget.h"
+#include "vtkMRMLMarkupsROINode.h"
+#include "vtkSlicerAngleWidget.h"
 #include "vtkSlicerClosedCurveWidget.h"
 #include "vtkSlicerCurveWidget.h"
-#include "vtkSlicerAngleWidget.h"
+#include "vtkSlicerLineWidget.h"
 #include "vtkSlicerPlaneWidget.h"
 #include "vtkSlicerPointsWidget.h"
+#include "vtkSlicerROIWidget.h"
 
 // DisplayableManager initialization
 #include <vtkAutoInit.h>
@@ -125,8 +127,6 @@ QIcon qSlicerMarkupsModule::icon()const
   return QIcon(":/Icons/Markups.png");
 }
 
-
-
 //-----------------------------------------------------------------------------
 void qSlicerMarkupsModule::setup()
 {
@@ -138,13 +138,15 @@ void qSlicerMarkupsModule::setup()
     qCritical() << Q_FUNC_INFO << ": cannot get Markups logic.";
     return;
     }
-  logic->RegisterMarkup(vtkMRMLMarkupsAngleNode::New(), vtkSlicerAngleWidget::New());
-  logic->RegisterMarkup(vtkMRMLMarkupsFiducialNode::New(), vtkSlicerPointsWidget::New());
-  logic->RegisterMarkup(vtkMRMLMarkupsLineNode::New(), vtkSlicerLineWidget::New());
-  logic->RegisterMarkup(vtkMRMLMarkupsCurveNode::New(), vtkSlicerCurveWidget::New());
-  logic->RegisterMarkup(vtkMRMLMarkupsClosedCurveNode::New(), vtkSlicerClosedCurveWidget::New());
-  logic->RegisterMarkup(vtkMRMLMarkupsPlaneNode::New(), vtkSlicerPlaneWidget::New());
 
+  // Register markups
+  logic->SetMarkup(vtkMRMLMarkupsFiducialNode::New(), vtkSlicerPointsWidget::New());
+  logic->SetMarkup(vtkMRMLMarkupsLineNode::New(), vtkSlicerLineWidget::New());
+  logic->SetMarkup(vtkMRMLMarkupsAngleNode::New(), vtkSlicerAngleWidget::New());
+  logic->SetMarkup(vtkMRMLMarkupsCurveNode::New(), vtkSlicerCurveWidget::New());
+  logic->SetMarkup(vtkMRMLMarkupsClosedCurveNode::New(), vtkSlicerClosedCurveWidget::New());
+  logic->SetMarkup(vtkMRMLMarkupsPlaneNode::New(), vtkSlicerPlaneWidget::New());
+  logic->SetMarkup(vtkMRMLMarkupsROINode::New(), vtkSlicerROIWidget::New());
 
   // Register displayable managers (same displayable manager handles both slice and 3D views)
   vtkMRMLSliceViewDisplayableManagerFactory::GetInstance()->RegisterDisplayableManager("vtkMRMLMarkupsDisplayableManager");
@@ -173,9 +175,26 @@ void qSlicerMarkupsModule::setup()
 }
 
 //-----------------------------------------------------------------------------
-qSlicerAbstractModuleRepresentation * qSlicerMarkupsModule::createWidgetRepresentation()
+qSlicerAbstractModuleRepresentation* qSlicerMarkupsModule::createWidgetRepresentation()
 {
-  return new qSlicerMarkupsModuleWidget;
+  // Create and configure module widget.
+  qSlicerMarkupsModuleWidget* moduleWidget = new qSlicerMarkupsModuleWidget();
+  moduleWidget->setCreateMarkupsButtonsColumns(6);
+
+  // Register markups
+  moduleWidget->setMarkup("Fiducial");
+  moduleWidget->setMarkup("Line");
+  moduleWidget->setMarkup("Angle", new qSlicerMarkupsAngleMeasurementsWidget);
+  moduleWidget->setMarkup("Curve", new qSlicerMarkupsCurveSettingsWidget);
+  moduleWidget->setMarkup("ClosedCurve");
+  moduleWidget->setMarkup("Plane");
+  moduleWidget->setMarkup("ROI", new qMRMLMarkupsROIWidget);
+
+  // Set the number of columns for the grid of "add markups buttons" to the number of markups
+  // regitered in this module.
+  moduleWidget->setCreateMarkupsButtonsColumns(7);
+
+  return moduleWidget;
 }
 
 //-----------------------------------------------------------------------------

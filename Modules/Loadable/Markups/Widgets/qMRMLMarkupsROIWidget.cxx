@@ -42,12 +42,16 @@ class qMRMLMarkupsROIWidgetPrivate: public Ui_qMRMLMarkupsROIWidget
 protected:
   qMRMLMarkupsROIWidget* const q_ptr;
 public:
+
   qMRMLMarkupsROIWidgetPrivate(qMRMLMarkupsROIWidget& object);
-  void init();
+  void setupUi(qMRMLMarkupsROIWidget* widget);
 
   vtkMRMLMarkupsROINode* ROINode;
   bool IsProcessingOnMRMLNodeModified;
   bool AutoRange;
+
+  // Internal node to operate
+  vtkWeakPointer<vtkMRMLMarkupsNode> MarkupsNode;
 };
 
 // --------------------------------------------------------------------------
@@ -59,11 +63,21 @@ qMRMLMarkupsROIWidgetPrivate::qMRMLMarkupsROIWidgetPrivate(qMRMLMarkupsROIWidget
   this->AutoRange = true;
 }
 
-// --------------------------------------------------------------------------
-void qMRMLMarkupsROIWidgetPrivate::init()
+void qMRMLMarkupsROIWidgetPrivate::setupUi(qMRMLMarkupsROIWidget* widget)
 {
   Q_Q(qMRMLMarkupsROIWidget);
-  this->setupUi(q);
+
+  this->Ui_qMRMLMarkupsROIWidget::setupUi(widget);
+
+  this->roiSettingsCollapseButton->setVisible(false);
+  this->roiTypeComboBox->clear();
+  for (int roiType = 0; roiType < vtkMRMLMarkupsROINode::ROIType_Last; ++roiType)
+    {
+    this->roiTypeComboBox->addItem(vtkMRMLMarkupsROINode::GetROITypeAsString(roiType), roiType);
+    }
+
+  QObject::connect(this->roiTypeComboBox, SIGNAL(currentIndexChanged(int)),
+    q, SLOT(onROITypeParameterChanged()));
   QObject::connect(this->DisplayClippingBoxButton, SIGNAL(toggled(bool)),
                    q, SLOT(setDisplayClippingBox(bool)));
   QObject::connect(this->InteractiveModeCheckBox, SIGNAL(toggled(bool)),
@@ -81,17 +95,30 @@ void qMRMLMarkupsROIWidgetPrivate::init()
 // qMRMLMarkupsROIWidget methods
 
 // --------------------------------------------------------------------------
-qMRMLMarkupsROIWidget::qMRMLMarkupsROIWidget(QWidget* _parent)
-  : QWidget(_parent)
+qMRMLMarkupsROIWidget::qMRMLMarkupsROIWidget(QWidget* parent)
+  : qSlicerMarkupsAdditionalWidget(parent)
   , d_ptr(new qMRMLMarkupsROIWidgetPrivate(*this))
 {
-  Q_D(qMRMLMarkupsROIWidget);
-  d->init();
+  this->setup();
 }
 
 // --------------------------------------------------------------------------
 qMRMLMarkupsROIWidget::~qMRMLMarkupsROIWidget() = default;
 
+// --------------------------------------------------------------------------
+void qMRMLMarkupsROIWidget::setup()
+{
+  Q_D(qMRMLMarkupsROIWidget);
+  d->setupUi(this);
+
+}
+
+// --------------------------------------------------------------------------
+void qMRMLMarkupsROIWidget::setMRMLMarkupsNode(vtkMRMLMarkupsNode* markupsNode)
+{
+  Q_D(qMRMLMarkupsROIWidget);
+  d->MarkupsNode = markupsNode;
+}
 // --------------------------------------------------------------------------
 vtkMRMLMarkupsROINode* qMRMLMarkupsROIWidget::mrmlROINode()const
 {
@@ -198,6 +225,24 @@ void qMRMLMarkupsROIWidget::setExtent(double minLR, double maxLR,
 }
 
 // --------------------------------------------------------------------------
+void qMRMLMarkupsROIWidget::updateWidgetFromMRML()
+{
+  Q_D(qMRMLMarkupsROIWidget);
+
+  vtkMRMLMarkupsROINode* markupsROINode = vtkMRMLMarkupsROINode::SafeDownCast(d->MarkupsNode);
+
+  d->roiSettingsCollapseButton->setVisible(markupsROINode != nullptr);
+
+  if (markupsROINode)
+  {
+    bool wasBlocked = d->roiTypeComboBox->blockSignals(true);
+    d->roiTypeComboBox->setCurrentIndex(d->roiTypeComboBox->findData(markupsROINode->GetROIType()));
+    d->roiTypeComboBox->blockSignals(wasBlocked);
+    this->setMRMLMarkupsROINode(markupsROINode);
+  }
+}
+
+// --------------------------------------------------------------------------
 void qMRMLMarkupsROIWidget::setDisplayClippingBox(bool visible)
 {
   Q_D(qMRMLMarkupsROIWidget);
@@ -268,4 +313,17 @@ void qMRMLMarkupsROIWidget::onMRMLDisplayNodeModified()
 
   // Visibility
   d->DisplayClippingBoxButton->setChecked(d->ROINode->GetDisplayVisibility());
+}
+
+//-----------------------------------------------------------------------------
+void qMRMLMarkupsROIWidget::onROITypeParameterChanged()
+{
+  Q_D(qMRMLMarkupsROIWidget);
+  vtkMRMLMarkupsROINode* roiNode = vtkMRMLMarkupsROINode::SafeDownCast(d->MarkupsNode);
+  if (!roiNode)
+    {
+    return;
+    }
+  MRMLNodeModifyBlocker blocker(roiNode);
+  roiNode->SetROIType(d->roiTypeComboBox->currentData().toInt());
 }

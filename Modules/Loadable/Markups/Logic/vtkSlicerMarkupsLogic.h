@@ -259,6 +259,11 @@ public:
   /// class is not registered.
   vtkSlicerMarkupsWidget* GetWidgetByMarkupsNodeClass(const char* className) const;
 
+  /// This returns a constant reference to the regstered markups. This is useful to check what
+  /// are the markups that are regisered.
+  const std::map<std::string, vtkSmartPointer<vtkSlicerMarkupsWidget> >& RegisteredMarkups()const
+    {return this->MarkupsWidgetsMap;}
+
 protected:
   vtkSlicerMarkupsLogic();
   ~vtkSlicerMarkupsLogic() override;
@@ -278,7 +283,7 @@ protected:
   vtkMRMLSelectionNode* SelectionNode{nullptr};
 
   // Keeps track of the registered nodes and corresponding widgets
-  std::map<std::string, vtkSmartPointer<vtkSlicerMarkupsWidget>> MarkupsWidgetsMap;
+  std::map<std::string, vtkSmartPointer<vtkSlicerMarkupsWidget> > MarkupsWidgetsMap;
 
 private:
 

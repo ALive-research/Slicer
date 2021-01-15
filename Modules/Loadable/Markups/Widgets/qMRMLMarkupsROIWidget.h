@@ -25,7 +25,8 @@
 // Qt includes
 #include <QWidget>
 
-// AnnotationWidgets includes
+// Markups widgets includes
+#include "qSlicerMarkupsAdditionalWidget.h"
 #include "qSlicerMarkupsModuleWidgetsExport.h"
 
 // CTK includes
@@ -37,7 +38,7 @@ class vtkMRMLNode;
 class vtkMRMLMarkupsROINode;
 class qMRMLMarkupsROIWidgetPrivate;
 
-class Q_SLICER_MODULE_MARKUPS_WIDGETS_EXPORT qMRMLMarkupsROIWidget : public QWidget
+class Q_SLICER_MODULE_MARKUPS_WIDGETS_EXPORT qMRMLMarkupsROIWidget : public qSlicerMarkupsAdditionalWidget
 {
   Q_OBJECT
   QVTK_OBJECT
@@ -50,10 +51,17 @@ public:
   /// Returns the current MRML ROI node
   vtkMRMLMarkupsROINode* mrmlROINode()const;
 
+  /// Sets the vtkMRMLMarkupsNode to operate on.
+  void setMRMLMarkupsNode(vtkMRMLMarkupsNode*) override;
+
   void setExtent(double min, double max);
   void setExtent(double minLR, double maxLR,
                  double minPA, double maxPA,
                  double minIS, double maxIS);
+
+  /// Updates the widget based on information from MRML.
+  void updateWidgetFromMRML() override;
+
 public slots:
 
   /// Set the MRML node of interest
@@ -80,13 +88,20 @@ protected slots:
   void updateROI();
   /// Internal function to update the ROIDisplay node
   void onMRMLDisplayNodeModified();
+  /// Internal function to update type of ROI
+  void onROITypeParameterChanged();
+
+protected:
+  void setup();
 
 protected:
   QScopedPointer<qMRMLMarkupsROIWidgetPrivate> d_ptr;
 
+
 private:
   Q_DECLARE_PRIVATE(qMRMLMarkupsROIWidget);
   Q_DISABLE_COPY(qMRMLMarkupsROIWidget);
+
 };
 
 #endif

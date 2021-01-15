@@ -20,6 +20,7 @@
 #include <QClipboard>
 #include <QDebug>
 #include <QInputDialog>
+#include <QList>
 #include <QMenu>
 #include <QMessageBox>
 #include <QModelIndex>
@@ -29,12 +30,13 @@
 #include <QSignalMapper>
 #include <QStringList>
 #include <QTableWidgetItem>
-#include <QTimer>
+#include <QSharedPointer>
 
 // CTK includes
 #include "ctkMessageBox.h"
 
 // Slicer includes
+#include "qMRMLNodeFactory.h"
 #include "qMRMLSceneModel.h"
 #include "qMRMLSortFilterSubjectHierarchyProxyModel.h"
 #include "qMRMLSubjectHierarchyModel.h"
@@ -53,19 +55,15 @@
 #include "vtkMRMLMarkupsDisplayableManager.h"
 
 // Markups includes
+#include "qSlicerMarkupsAdditionalWidget.h"
 #include "qSlicerMarkupsModule.h"
 #include "qSlicerMarkupsModuleWidget.h"
 #include "ui_qSlicerMarkupsModule.h"
-#include "vtkMRMLMarkupsFiducialNode.h"
-#include "vtkMRMLMarkupsLineNode.h"
-#include "vtkMRMLMarkupsAngleNode.h"
 #include "vtkMRMLMarkupsCurveNode.h"
-#include "vtkMRMLMarkupsClosedCurveNode.h"
+#include "vtkMRMLMarkupsDisplayNode.h"
 #include "vtkMRMLMarkupsFiducialStorageNode.h"
 #include "vtkMRMLMarkupsNode.h"
-#include "vtkMRMLMarkupsROINode.h"
 #include "vtkSlicerMarkupsLogic.h"
-#include "vtkSlicerDijkstraGraphGeodesicPath.h"
 
 // VTK includes
 #include <vtkMath.h>
@@ -106,8 +104,8 @@ public:
 
   vtkMRMLMarkupsDisplayNode* markupsDisplayNode();
 
-  static const char* getCurveTypeAsHumanReadableString(int curveType);
-  static const char* getCostFunctionAsHumanReadableString(int costFunction);
+  // update the markups creation buttons.
+  void updateCreateMarkupsPushButtons(QGridLayout* layout);
 
 private:
   vtkWeakPointer<vtkMRMLMarkupsNode> MarkupsNode;
@@ -132,12 +130,21 @@ private:
   QAction*    copyAction;
   QAction*    pasteAction;
 
-  QTimer*     editScalarFunctionDelay;
-
   QPixmap     SlicerLockIcon;
   QPixmap     SlicerUnlockIcon;
   QPixmap     SlicerVisibleIcon;
   QPixmap     SlicerInvisibleIcon;
+
+  // Dynamic list of create markups push buttons
+  QList<QPushButton*> ceateMarkupsPushButtons;
+  unsigned int createMarkupsButtonsColumns;
+
+  // Dynamic list of additional widgets
+  QMap<QString, qSlicerMarkupsAdditionalWidget*> registeredMarkupsMap;
+
+  // This list keeps the order of insertion in the map (that is the order the buttons should be displayed.)
+  QStringList markupsOrder;
+
 };
 
 //-----------------------------------------------------------------------------
@@ -166,12 +173,13 @@ qSlicerMarkupsModuleWidgetPrivate::qSlicerMarkupsModuleWidgetPrivate(qSlicerMark
   this->copyAction = nullptr;
   this->pasteAction = nullptr;
 
-  this->editScalarFunctionDelay = nullptr;
 
   this->SlicerLockIcon = QPixmap(":/Icons/Small/SlicerLock.png");
   this->SlicerUnlockIcon = QPixmap(":/Icons/Small/SlicerUnlock.png");
   this->SlicerVisibleIcon = QPixmap(":/Icons/Small/SlicerVisible.png");
   this->SlicerInvisibleIcon = QPixmap(":/Icons/Small/SlicerInvisible.png");
+
+  this->createMarkupsButtonsColumns = 0;
 }
 
 //-----------------------------------------------------------------------------
@@ -189,7 +197,23 @@ void qSlicerMarkupsModuleWidgetPrivate::setupUi(qSlicerWidget* widget)
   Q_Q(qSlicerMarkupsModuleWidget);
   this->Ui_qSlicerMarkupsModule::setupUi(widget);
 
-  this->activeMarkupTreeView->setNodeTypes(QStringList(QString("vtkMRMLMarkupsNode")));
+  QStringList registeredMarkups;
+  foreach(const QString& name, this->registeredMarkupsMap.keys())
+  {
+    const char* tagName =
+      q->markupsLogic()->GetNodeByMarkupsName(name.toStdString().c_str())->GetNodeTagName();
+
+    if (tagName)
+    {
+      QString nodeType = QString("vtkMRML") +
+        QString(tagName) +
+        QString("Node");
+
+      registeredMarkups << nodeType;
+    }
+  }
+
+  this->activeMarkupTreeView->setNodeTypes(registeredMarkups);
   this->activeMarkupTreeView->setColumnHidden(this->activeMarkupTreeView->model()->idColumn(), true);
   this->activeMarkupTreeView->setColumnHidden(this->activeMarkupTreeView->model()->transformColumn(), true);
   this->activeMarkupTreeView->setColumnHidden(this->activeMarkupTreeView->model()->descriptionColumn(), false);
@@ -326,20 +350,12 @@ void qSlicerMarkupsModuleWidgetPrivate::setupUi(qSlicerWidget* widget)
   // set up the active markups node selector
   QObject::connect(this->activeMarkupTreeView, SIGNAL(currentItemChanged(vtkIdType)),
     q, SLOT(onActiveMarkupItemChanged(vtkIdType)));
-  QObject::connect(this->createFiducialPushButton, SIGNAL(clicked()),
-    q, SLOT(onCreateMarkupsFiducial()));
-  QObject::connect(this->createLinePushButton, SIGNAL(clicked()),
-    q, SLOT(onCreateMarkupsLine()));
-  QObject::connect(this->createAnglePushButton, SIGNAL(clicked()),
-    q, SLOT(onCreateMarkupsAngle()));
-  QObject::connect(this->createOpenCurvePushButton, SIGNAL(clicked()),
-    q, SLOT(onCreateMarkupsOpenCurve()));
-  QObject::connect(this->createClosedCurvePushButton, SIGNAL(clicked()),
-    q, SLOT(onCreateMarkupsClosedCurve()));
-  QObject::connect(this->createPlanePushButton, SIGNAL(clicked()),
-    q, SLOT(onCreateMarkupsPlane()));
-  QObject::connect(this->createROIPushButton, SIGNAL(clicked()),
-    q, SLOT(onCreateMarkupsROI()));
+
+
+  // Create the layout for the create markups group box.
+  QGridLayout *gridLayout = new QGridLayout();
+  this->createMarkupsGroupBox->setLayout(gridLayout);
+  this->updateCreateMarkupsPushButtons(gridLayout);
 
   // Make sure that the Jump to Slices radio buttons match the default of the
   // MRML slice node
@@ -457,51 +473,20 @@ void qSlicerMarkupsModuleWidgetPrivate::setupUi(qSlicerWidget* widget)
   QObject::connect(this->saveToDefaultDisplayPropertiesPushButton, SIGNAL(clicked()),
     q, SLOT(onSaveToDefaultDisplayPropertiesPushButtonClicked()));
 
-  this->curveSettingsCollapseButton->setVisible(false);
-  this->resampleCurveCollapsibleButton->setVisible(false);
-  QObject::connect(this->resampleCurveButton, SIGNAL(clicked()),
-    q, SLOT(onApplyCurveResamplingPushButtonClicked()));
 
-  this->angleMeasurementModeCollapsibleButton->setVisible(false);
-  QObject::connect(this->angleMeasurementModeComboBox, SIGNAL(currentIndexChanged(int)),
-    q, SLOT(onAngleMeasurementModeChanged()));
-  QObject::connect(this->rotationAxisCoordinatesWidget, SIGNAL(coordinatesChanged(double*)),
-    q, SLOT(onRotationAxisChanged()));
-
-  this->curveTypeComboBox->clear();
-  for (int curveType = 0; curveType < vtkCurveGenerator::CURVE_TYPE_LAST; ++curveType)
+  // Add the additional widgets
+  foreach(const QString& str, this->registeredMarkupsMap.keys())
     {
-    this->curveTypeComboBox->addItem(qSlicerMarkupsModuleWidgetPrivate::getCurveTypeAsHumanReadableString(curveType), curveType);
-    }
+     qSlicerMarkupsAdditionalWidget* additionalWidget = this->registeredMarkupsMap.value(str);
+      if (additionalWidget != nullptr)
+      {
+        this->markupsModuleVerticalLayout->addWidget(additionalWidget);
 
-  this->costFunctionComboBox->clear();
-  for (int costFunction = 0; costFunction < vtkSlicerDijkstraGraphGeodesicPath::COST_FUNCTION_TYPE_LAST; ++costFunction)
-    {
-    this->costFunctionComboBox->addItem(qSlicerMarkupsModuleWidgetPrivate::getCostFunctionAsHumanReadableString(costFunction), costFunction);
+        // Forward the mrmlSceneChanged signal
+        QObject::connect(q, SIGNAL(mrmlSceneChanged(vtkMRMLScene*)),
+                         widget, SLOT(setMRMLScene(vtkMRMLScene*)));
+      }
     }
-
-  this->editScalarFunctionDelay = new QTimer(q);
-  this->editScalarFunctionDelay->setInterval(500);
-  this->editScalarFunctionDelay->setSingleShot(true);
-  QObject::connect(this->editScalarFunctionDelay, SIGNAL(timeout()),
-    q, SLOT(onCurveTypeParameterChanged()));
-  QObject::connect(this->curveTypeComboBox, SIGNAL(currentIndexChanged(int)),
-    q, SLOT(onCurveTypeParameterChanged()));
-  QObject::connect(this->modelNodeSelector, SIGNAL(currentNodeChanged(vtkMRMLNode*)),
-    q, SLOT(onCurveTypeParameterChanged()));
-  QObject::connect(this->costFunctionComboBox, SIGNAL(currentIndexChanged(int)),
-    q, SLOT(onCurveTypeParameterChanged()));
-  QObject::connect(this->scalarFunctionLineEdit, SIGNAL(textChanged(QString)),
-    this->editScalarFunctionDelay, SLOT(start()));
-
-  this->roiSettingsCollapseButton->setVisible(false);
-  this->roiTypeComboBox->clear();
-  for (int roiType = 0; roiType < vtkMRMLMarkupsROINode::ROIType_Last; ++roiType)
-    {
-    this->roiTypeComboBox->addItem(vtkMRMLMarkupsROINode::GetROITypeAsString(roiType), roiType);
-    }
-  QObject::connect(this->roiTypeComboBox, SIGNAL(currentIndexChanged(int)),
-    q, SLOT(onROITypeParameterChanged()));
 
   // hide measurement settings table until markups node containing measurement is set
   this->measurementSettingsTableWidget->setVisible(false);
@@ -605,6 +590,15 @@ void qSlicerMarkupsModuleWidgetPrivate::setMRMLMarkupsNodeFromSelectionNode()
       }
     }
   q->setMRMLMarkupsNode(currentMarkupsNode);
+
+  foreach(const QString& str, this->registeredMarkupsMap.keys())
+    {
+     qSlicerMarkupsAdditionalWidget* additionalWidget = this->registeredMarkupsMap.value(str);
+      if (additionalWidget != nullptr)
+      {
+        this->registeredMarkupsMap.value(str)->setMRMLMarkupsNode(currentMarkupsNode);
+      }
+    }
 }
 
 //-----------------------------------------------------------------------------
@@ -638,67 +632,62 @@ void qSlicerMarkupsModuleWidgetPrivate::setPlaceModeEnabled(bool placeEnable)
     }
 }
 
-//-----------------------------------------------------------
-const char* qSlicerMarkupsModuleWidgetPrivate::getCurveTypeAsHumanReadableString(int curveType)
+//-----------------------------------------------------------------------------
+void qSlicerMarkupsModuleWidgetPrivate::updateCreateMarkupsPushButtons(QGridLayout *layout)
 {
-  switch (curveType)
+  Q_Q(qSlicerMarkupsModuleWidget);
+
+  vtkMRMLApplicationLogic* appLogic = q->appLogic();
+  if (!appLogic)
     {
-    case vtkCurveGenerator::CURVE_TYPE_LINEAR_SPLINE:
+      qCritical() << Q_FUNC_INFO << "updateCreateMarkupsPushButtons: invalid application logic.";
+      return;
+    }
+
+  vtkSlicerMarkupsLogic* markupsLogic =
+    vtkSlicerMarkupsLogic::SafeDownCast(appLogic->GetModuleLogic("Markups"));
+  if (!markupsLogic)
+    {
+    qCritical() << Q_FUNC_INFO << "updateCreateMarkupsPushButtons: invalid module logic.";
+    return;
+    }
+
+  unsigned int i=0;
+  for(const QString& markupName : this->markupsOrder)
+    {
+    vtkMRMLMarkupsNode* markupsNode = nullptr;
+    for(const auto& markup : markupsLogic->GetMarkupsNodes())
       {
-      return "Linear";
+      if (markupName == markup.second->GetMarkupName())
+        {
+        markupsNode = markup.second;
+        break;
+        }
       }
-    case vtkCurveGenerator::CURVE_TYPE_CARDINAL_SPLINE:
+
+    // Create markups add buttons.
+    QSignalMapper* mapper = new QSignalMapper(q);
+    if (markupsNode)
       {
-      return "Spline";
-      }
-    case vtkCurveGenerator::CURVE_TYPE_KOCHANEK_SPLINE:
-      {
-      return "Kochanek spline";
-      }
-    case vtkCurveGenerator::CURVE_TYPE_POLYNOMIAL:
-      {
-      return "Polynomial";
-      }
-    case vtkCurveGenerator::CURVE_TYPE_SHORTEST_DISTANCE_ON_SURFACE:
-      {
-      return "Shortest distance on surface";
-      }
-    default:
-      {
-      vtkGenericWarningMacro("Unknown curve type: " << curveType);
-      return "Unknown";
+      QPushButton *markupCreatePushButton = new QPushButton();
+      markupCreatePushButton->setIcon(QIcon(markupsNode->GetAddIcon()));
+      layout->addWidget(markupCreatePushButton,
+                        i / this->createMarkupsButtonsColumns,
+                        i % this->createMarkupsButtonsColumns);
+
+      QObject::connect(markupCreatePushButton, SIGNAL(clicked()), mapper, SLOT(map()));
+      mapper->setMapping(markupCreatePushButton, markupsNode->GetClassName());
+      QObject::connect(mapper, SIGNAL(mapped(const QString&)),
+                       q, SLOT(onCreateMarkupByClass(const QString&)));
+
+      // Alternative connection using lambdas instead of QSignalMapper
+      // QObject::connect(markupCreatePushButton, &QPushButton::clicked,
+      //                  q, [q, markupsNode] {q->onCreateMarkupByClass(markupsNode->GetClassName());});
+
+      ++i;
       }
     }
 }
-
-//------------------------------------------------------------------------------
-const char* qSlicerMarkupsModuleWidgetPrivate::getCostFunctionAsHumanReadableString(int costFunction)
-{
-  switch (costFunction)
-    {
-    case vtkSlicerDijkstraGraphGeodesicPath::COST_FUNCTION_TYPE_DISTANCE:
-      {
-      return "Distance";
-      }
-    case vtkSlicerDijkstraGraphGeodesicPath::COST_FUNCTION_TYPE_ADDITIVE:
-      {
-      return "Additive";
-      }
-    case vtkSlicerDijkstraGraphGeodesicPath::COST_FUNCTION_TYPE_MULTIPLICATIVE:
-      {
-      return "Multiplicative";
-      }
-    case vtkSlicerDijkstraGraphGeodesicPath::COST_FUNCTION_TYPE_INVERSE_SQUARED:
-      {
-      return "Inverse squared";
-      }
-    default:
-      {
-      return "";
-      }
-    }
-}
-
 
 //-----------------------------------------------------------------------------
 // qSlicerMarkupsModuleWidget methods
@@ -711,11 +700,19 @@ qSlicerMarkupsModuleWidget::qSlicerMarkupsModuleWidget(QWidget* _parent)
   this->volumeSpacingScaleFactor = 10.0;
 }
 
-
 //-----------------------------------------------------------------------------
 qSlicerMarkupsModuleWidget::~qSlicerMarkupsModuleWidget()
 {
+  Q_D(qSlicerMarkupsModuleWidget);
   this->setMRMLMarkupsNode(nullptr);
+  foreach(const QString& str, d->registeredMarkupsMap.keys())
+  {
+    qSlicerMarkupsAdditionalWidget* additionalWidget = d->registeredMarkupsMap.value(str);
+    if (additionalWidget != nullptr)
+    {
+      d->registeredMarkupsMap.value(str)->setMRMLMarkupsNode(nullptr);
+    }
+  }
 }
 
 //-----------------------------------------------------------------------------
@@ -760,11 +757,19 @@ void qSlicerMarkupsModuleWidget::enter()
 
   // Add event observers to MarkupsNode
   if (d->MarkupsNode)
-    {
+  {
     vtkMRMLMarkupsNode* markupsNode = d->MarkupsNode;
     d->MarkupsNode = nullptr; // this will force a reset
     this->setMRMLMarkupsNode(markupsNode);
+    foreach(const QString& str, d->registeredMarkupsMap.keys())
+    {
+      qSlicerMarkupsAdditionalWidget* additionalWidget = d->registeredMarkupsMap.value(str);
+      if (additionalWidget != nullptr)
+      {
+        d->registeredMarkupsMap.value(str)->setMRMLMarkupsNode(markupsNode);
+      }
     }
+  }
 
   // check the max scales against volume spacing, they might need to be updated
   this->updateMaximumScaleFromVolumes();
@@ -934,108 +939,14 @@ void qSlicerMarkupsModuleWidget::updateWidgetFromMRML()
     this->updateRow(m);
     }
 
-  vtkMRMLMarkupsCurveNode* markupsCurveNode = vtkMRMLMarkupsCurveNode::SafeDownCast(d->MarkupsNode);
-  vtkMRMLMarkupsAngleNode* markupsAngleNode = vtkMRMLMarkupsAngleNode::SafeDownCast(d->MarkupsNode);
-  vtkMRMLMarkupsROINode* markupsROINode = vtkMRMLMarkupsROINode::SafeDownCast(d->MarkupsNode);
-
-  d->resampleCurveCollapsibleButton->setVisible(markupsCurveNode != nullptr);
-  d->angleMeasurementModeCollapsibleButton->setVisible(markupsAngleNode != nullptr);
-  d->curveSettingsCollapseButton->setVisible(markupsCurveNode != nullptr);
-  d->roiSettingsCollapseButton->setVisible(markupsROINode != nullptr);
-
-  if (markupsCurveNode)
+  // Add the additional widgets
+  foreach(const QString& str, d->registeredMarkupsMap.keys())
     {
-    // Update displayed node types.
-    // Since updating this list resets the previous node selection,
-    // we save and restore previous selection.
-    vtkMRMLNode* previousOutputNode = d->resampleCurveOutputNodeSelector->currentNode();
-    d->resampleCurveOutputNodeSelector->setNodeTypes(QStringList(QString(markupsCurveNode->GetClassName())));
-    if (previousOutputNode && previousOutputNode->IsA(markupsCurveNode->GetClassName()))
+      qSlicerMarkupsAdditionalWidget* additionalWidget = d->registeredMarkupsMap.value(str);
+      if (additionalWidget != nullptr)
       {
-      d->resampleCurveOutputNodeSelector->setCurrentNode(previousOutputNode);
+        d->registeredMarkupsMap.value(str)->updateWidgetFromMRML();
       }
-    else
-      {
-      d->resampleCurveOutputNodeSelector->setCurrentNode(nullptr);
-      }
-
-    wasBlocked = d->curveTypeComboBox->blockSignals(true);
-    d->curveTypeComboBox->setCurrentIndex(d->curveTypeComboBox->findData(markupsCurveNode->GetCurveType()));
-    d->curveTypeComboBox->blockSignals(wasBlocked);
-
-    vtkMRMLModelNode* modelNode = markupsCurveNode->GetShortestDistanceSurfaceNode();
-    wasBlocked = d->modelNodeSelector->blockSignals(true);
-    d->modelNodeSelector->setCurrentNode(modelNode);
-    d->modelNodeSelector->blockSignals(wasBlocked);
-
-    wasBlocked = d->costFunctionComboBox->blockSignals(true);
-    int costFunction = markupsCurveNode->GetSurfaceCostFunctionType();
-    d->costFunctionComboBox->setCurrentIndex(d->costFunctionComboBox->findData(costFunction));
-    d->costFunctionComboBox->blockSignals(wasBlocked);
-
-    wasBlocked = d->scalarFunctionLineEdit->blockSignals(true);
-    int currentCursorPosition = d->scalarFunctionLineEdit->cursorPosition();
-    d->scalarFunctionLineEdit->setText(markupsCurveNode->GetSurfaceDistanceWeightingFunction());
-    d->scalarFunctionLineEdit->setCursorPosition(currentCursorPosition);
-    d->scalarFunctionLineEdit->blockSignals(wasBlocked);
-
-    if (costFunction == vtkSlicerDijkstraGraphGeodesicPath::COST_FUNCTION_TYPE_DISTANCE)
-      {
-      d->scalarFunctionLineEdit->setVisible(false);
-      }
-    else
-      {
-      d->scalarFunctionLineEdit->setVisible(true);
-      }
-
-    QString prefixString;
-    QString suffixString;
-    switch (costFunction)
-      {
-      case vtkSlicerDijkstraGraphGeodesicPath::COST_FUNCTION_TYPE_ADDITIVE:
-        prefixString = "distance + ";
-        break;
-      case vtkSlicerDijkstraGraphGeodesicPath::COST_FUNCTION_TYPE_MULTIPLICATIVE:
-        prefixString = "distance * ";
-        break;
-      case vtkSlicerDijkstraGraphGeodesicPath::COST_FUNCTION_TYPE_INVERSE_SQUARED:
-        prefixString = "distance / (";
-        suffixString = " ^ 2";
-        break;
-      default:
-      case vtkSlicerDijkstraGraphGeodesicPath::COST_FUNCTION_TYPE_DISTANCE:
-        prefixString = "distance";
-        break;
-      }
-    d->scalarFunctionPrefixLabel->setText(prefixString);
-    d->scalarFunctionSuffixLabel->setText(suffixString);
-    }
-
-  if (markupsAngleNode)
-    {
-    double axisVector[3] = {0.0, 0.0, 0.0};
-    markupsAngleNode->GetOrientationRotationAxis(axisVector);
-    bool wasBlocked = d->rotationAxisCoordinatesWidget->blockSignals(true);
-    d->rotationAxisCoordinatesWidget->setCoordinates(axisVector);
-    d->rotationAxisCoordinatesWidget->blockSignals(wasBlocked);
-    d->rotationAxisCoordinatesWidget->setEnabled(markupsAngleNode->GetAngleMeasurementMode() != vtkMRMLMarkupsAngleNode::Minimal);
-    }
-
-  if (markupsROINode)
-    {
-    wasBlocked = d->roiTypeComboBox->blockSignals(true);
-    d->roiTypeComboBox->setCurrentIndex(d->roiTypeComboBox->findData(markupsROINode->GetROIType()));
-    d->roiTypeComboBox->blockSignals(wasBlocked);
-    }
-  d->roiWidget->setMRMLMarkupsROINode(markupsROINode);
-
-  if (markupsCurveNode && markupsCurveNode->GetCurveType() == vtkCurveGenerator::CURVE_TYPE_SHORTEST_DISTANCE_ON_SURFACE)
-    {
-    d->surfaceCurveCollapsibleButton->setEnabled(true);
-    }
-  else
-    {
-    d->surfaceCurveCollapsibleButton->setEnabled(false);
     }
 }
 
@@ -1236,12 +1147,15 @@ void qSlicerMarkupsModuleWidget::onNodeAddedEvent(vtkObject*, vtkObject* node)
     {
     return;
     }
+
   vtkMRMLMarkupsNode* markupsNode = vtkMRMLMarkupsNode::SafeDownCast(node);
-  if (markupsNode)
+  if (!markupsNode)
     {
-    // make it active
-    d->activeMarkupTreeView->setCurrentNode(markupsNode);
+      return;
     }
+
+  // make it active
+  d->activeMarkupTreeView->setCurrentNode(markupsNode);
 }
 
 //-----------------------------------------------------------------------------
@@ -1594,6 +1508,20 @@ void qSlicerMarkupsModuleWidget::onActiveMarkupItemChanged(vtkIdType)
 }
 
 //-----------------------------------------------------------------------------
+void qSlicerMarkupsModuleWidget::onActiveMarkupMRMLNodeAdded(vtkMRMLNode *markupsNode)
+{
+  Q_D(qSlicerMarkupsModuleWidget);
+  if (this->markupsLogic())
+    {
+    this->markupsLogic()->AddNewDisplayNodeForMarkupsNode(markupsNode);
+    }
+  // make sure it's set up for the mouse mode tool bar to easily add points to
+  // it by making it active in the selection node
+  d->setSelectionNodeActivePlaceNode(markupsNode);
+  d->setPlaceModeEnabled(true);
+}
+
+//-----------------------------------------------------------------------------
 void qSlicerMarkupsModuleWidget::onActiveMarkupMRMLNodeChanged(vtkMRMLNode *node)
 {
   Q_D(qSlicerMarkupsModuleWidget);
@@ -1616,80 +1544,12 @@ void qSlicerMarkupsModuleWidget::onActiveMarkupMRMLNodeChanged(vtkMRMLNode *node
 }
 
 //-----------------------------------------------------------------------------
-void qSlicerMarkupsModuleWidget::onCreateMarkupsFiducial()
+void qSlicerMarkupsModuleWidget::onCreateMarkupByClass(const QString& className)
 {
   if (this->mrmlScene())
     {
-    this->onActiveMarkupMRMLNodeAdded(this->mrmlScene()->AddNewNodeByClass("vtkMRMLMarkupsFiducialNode"));
+    this->onActiveMarkupMRMLNodeAdded(this->mrmlScene()->AddNewNodeByClass(className.toStdString().c_str()));
     }
-}
-
-//-----------------------------------------------------------------------------
-void qSlicerMarkupsModuleWidget::onCreateMarkupsLine()
-{
-  if (this->mrmlScene())
-    {
-    this->onActiveMarkupMRMLNodeAdded(this->mrmlScene()->AddNewNodeByClass("vtkMRMLMarkupsLineNode"));
-    }
-}
-
-//-----------------------------------------------------------------------------
-void qSlicerMarkupsModuleWidget::onCreateMarkupsAngle()
-{
-  if (this->mrmlScene())
-    {
-    this->onActiveMarkupMRMLNodeAdded(this->mrmlScene()->AddNewNodeByClass("vtkMRMLMarkupsAngleNode"));
-    }
-}
-
-//-----------------------------------------------------------------------------
-void qSlicerMarkupsModuleWidget::onCreateMarkupsOpenCurve()
-{
-  if (this->mrmlScene())
-    {
-    this->onActiveMarkupMRMLNodeAdded(this->mrmlScene()->AddNewNodeByClass("vtkMRMLMarkupsCurveNode"));
-    }
-}
-
-//-----------------------------------------------------------------------------
-void qSlicerMarkupsModuleWidget::onCreateMarkupsClosedCurve()
-{
-  if (this->mrmlScene())
-    {
-    this->onActiveMarkupMRMLNodeAdded(this->mrmlScene()->AddNewNodeByClass("vtkMRMLMarkupsClosedCurveNode"));
-    }
-}
-
-//-----------------------------------------------------------------------------
-void qSlicerMarkupsModuleWidget::onCreateMarkupsPlane()
-{
-  if (this->mrmlScene())
-    {
-    this->onActiveMarkupMRMLNodeAdded(this->mrmlScene()->AddNewNodeByClass("vtkMRMLMarkupsPlaneNode"));
-    }
-}
-
-//-----------------------------------------------------------------------------
-void qSlicerMarkupsModuleWidget::onCreateMarkupsROI()
-{
-  if (this->mrmlScene())
-  {
-    this->onActiveMarkupMRMLNodeAdded(this->mrmlScene()->AddNewNodeByClass("vtkMRMLMarkupsROINode"));
-  }
-}
-
-//-----------------------------------------------------------------------------
-void qSlicerMarkupsModuleWidget::onActiveMarkupMRMLNodeAdded(vtkMRMLNode *markupsNode)
-{
-  Q_D(qSlicerMarkupsModuleWidget);
-  if (this->markupsLogic())
-    {
-    this->markupsLogic()->AddNewDisplayNodeForMarkupsNode(markupsNode);
-    }
-  // make sure it's set up for the mouse mode tool bar to easily add points to
-  // it by making it active in the selection node
-  d->setSelectionNodeActivePlaceNode(markupsNode);
-  d->setPlaceModeEnabled(true);
 }
 
 //-----------------------------------------------------------------------------
@@ -2267,7 +2127,7 @@ void qSlicerMarkupsModuleWidget::pasteSelectedFromClipboard()
     {
     // No fiducial list is selected - create a new one
     // Assume a fiducial markups
-    this->onCreateMarkupsFiducial();
+    this->onCreateMarkupByClass("vtkMRMLMarkupsFiducialNode");
     if (!d->MarkupsNode)
       {
       return;
@@ -2351,7 +2211,17 @@ void qSlicerMarkupsModuleWidget::setMRMLMarkupsNode(vtkMRMLMarkupsNode* markupsN
       this, SLOT(onMeasurementsCollectionModified()));
     }
 
+  // Setting the internal Markups node
   d->MarkupsNode = markupsNode;
+
+  foreach(const QString& str, d->registeredMarkupsMap.keys())
+    {
+     qSlicerMarkupsAdditionalWidget* additionalWidget = d->registeredMarkupsMap.value(str);
+      if (additionalWidget != nullptr)
+      {
+        d->registeredMarkupsMap.value(str)->setMRMLMarkupsNode(markupsNode);
+      }
+    }
 
   this->observeMeasurementsInCurrentMarkupsNode();
   this->updateMeasurementsDescriptionLabel();
@@ -2464,7 +2334,7 @@ void qSlicerMarkupsModuleWidget::onNewMarkupWithCurrentDisplayPropertiesTriggere
     {
     // if there's no currently active markups list, trigger the default add
     // node
-    this->onCreateMarkupsFiducial();
+    this->onCreateMarkupByClass("vtkMRMLMarkupsFiducialNode");
     return;
     }
 
@@ -2629,83 +2499,7 @@ void qSlicerMarkupsModuleWidget::onResetToDefaultDisplayPropertiesPushButtonClic
   this->markupsLogic()->SetDisplayNodeToDefaults(displayNode);
 }
 
-//-----------------------------------------------------------------------------
-void qSlicerMarkupsModuleWidget::onApplyCurveResamplingPushButtonClicked()
-{
-  Q_D(qSlicerMarkupsModuleWidget);
 
-  double resampleNumberOfPoints = d->resampleCurveNumerOfOutputPointsSpinBox->value();
-  if (resampleNumberOfPoints <= 1)
-    {
-    return;
-    }
-
-  vtkMRMLMarkupsCurveNode* inputNode = vtkMRMLMarkupsCurveNode::SafeDownCast(d->MarkupsNode);
-  if (!inputNode)
-    {
-    return;
-    }
-  vtkMRMLMarkupsCurveNode* outputNode = vtkMRMLMarkupsCurveNode::SafeDownCast(d->resampleCurveOutputNodeSelector->currentNode());
-  if (!outputNode)
-    {
-    outputNode = inputNode;
-    }
-  if(outputNode != inputNode)
-    {
-    MRMLNodeModifyBlocker blocker(outputNode);
-    vtkNew<vtkPoints> originalControlPoints;
-    inputNode->GetControlPointPositionsWorld(originalControlPoints);
-    outputNode->SetControlPointPositionsWorld(originalControlPoints);
-    vtkNew<vtkStringArray> originalLabels;
-    inputNode->GetControlPointLabels(originalLabels);
-    outputNode->SetControlPointLabels(originalLabels, originalControlPoints);
-    outputNode->SetCurveType(inputNode->GetCurveType());
-    outputNode->SetNumberOfPointsPerInterpolatingSegment(inputNode->GetNumberOfPointsPerInterpolatingSegment());
-    outputNode->SetAndObserveShortestDistanceSurfaceNode(inputNode->GetShortestDistanceSurfaceNode());
-    outputNode->SetSurfaceCostFunctionType(inputNode->GetSurfaceCostFunctionType());
-    outputNode->SetSurfaceDistanceWeightingFunction(inputNode->GetSurfaceDistanceWeightingFunction());
-    }
-  double sampleDist = outputNode->GetCurveLengthWorld() / (resampleNumberOfPoints - 1);
-  vtkMRMLModelNode* constraintNode = vtkMRMLModelNode::SafeDownCast(d->resampleCurveConstraintNodeSelector->currentNode());
-  if (constraintNode)
-    {
-    double maximumSearchRadius = 0.01*d->resampleCurveMaxSearchRadiusSliderWidget->value();
-    bool success = outputNode->ResampleCurveSurface(sampleDist, constraintNode, maximumSearchRadius);
-    if (!success)
-      {
-      qWarning("vtkMRMLMarkupsCurveNode::ResampleCurveSurface failed");
-      }
-    }
-  else
-    {
-    outputNode->ResampleCurveWorld(sampleDist);
-    }
-}
-
-//-----------------------------------------------------------------------------
-void qSlicerMarkupsModuleWidget::onAngleMeasurementModeChanged()
-{
-  Q_D(qSlicerMarkupsModuleWidget);
-  vtkMRMLMarkupsAngleNode* markupsAngleNode = vtkMRMLMarkupsAngleNode::SafeDownCast(d->MarkupsNode);
-  if (!markupsAngleNode)
-    {
-    return;
-    }
-
-  markupsAngleNode->SetAngleMeasurementMode(d->angleMeasurementModeComboBox->currentIndex());
-}
-
-//-----------------------------------------------------------------------------
-void qSlicerMarkupsModuleWidget::onRotationAxisChanged()
-{
-  Q_D(qSlicerMarkupsModuleWidget);
-  vtkMRMLMarkupsAngleNode* markupsAngleNode = vtkMRMLMarkupsAngleNode::SafeDownCast(d->MarkupsNode);
-  if (!markupsAngleNode)
-    {
-    return;
-    }
-  markupsAngleNode->SetOrientationRotationAxis(const_cast<double*>(d->rotationAxisCoordinatesWidget->coordinates()));
-}
 
 //-----------------------------------------------------------------------------
 void qSlicerMarkupsModuleWidget::onSaveToDefaultDisplayPropertiesPushButtonClicked()
@@ -2725,37 +2519,6 @@ void qSlicerMarkupsModuleWidget::onSaveToDefaultDisplayPropertiesPushButtonClick
 
   // also save the settings permanently
   qSlicerMarkupsModule::writeDefaultMarkupsDisplaySettings(this->markupsLogic()->GetDefaultMarkupsDisplayNode());
-}
-
-//-----------------------------------------------------------------------------
-void qSlicerMarkupsModuleWidget::onCurveTypeParameterChanged()
-{
-  Q_D(qSlicerMarkupsModuleWidget);
-  vtkMRMLMarkupsCurveNode* curveNode = vtkMRMLMarkupsCurveNode::SafeDownCast(d->MarkupsNode);
-  if (!curveNode)
-    {
-    return;
-    }
-
-  MRMLNodeModifyBlocker blocker(curveNode);
-  curveNode->SetCurveType(d->curveTypeComboBox->currentData().toInt());
-  curveNode->SetAndObserveShortestDistanceSurfaceNode(vtkMRMLModelNode::SafeDownCast(d->modelNodeSelector->currentNode()));
-  std::string functionString = d->scalarFunctionLineEdit->text().toStdString();
-  curveNode->SetSurfaceCostFunctionType(d->costFunctionComboBox->currentData().toInt());
-  curveNode->SetSurfaceDistanceWeightingFunction(functionString.c_str());
-}
-
-//-----------------------------------------------------------------------------
-void qSlicerMarkupsModuleWidget::onROITypeParameterChanged()
-{
-  Q_D(qSlicerMarkupsModuleWidget);
-  vtkMRMLMarkupsROINode* roiNode = vtkMRMLMarkupsROINode::SafeDownCast(d->MarkupsNode);
-  if (!roiNode)
-    {
-    return;
-    }
-  MRMLNodeModifyBlocker blocker(roiNode);
-  roiNode->SetROIType(d->roiTypeComboBox->currentData().toInt());
 }
 
 //-----------------------------------------------------------------------------
@@ -2925,4 +2688,27 @@ void qSlicerMarkupsModuleWidget::onMeasurementEnabledCheckboxToggled(bool on)
       currentMeasurement->SetEnabled(on);
       }
     }
+}
+
+//-----------------------------------------------------------------------------
+void qSlicerMarkupsModuleWidget::setCreateMarkupsButtonsColumns(unsigned int columns)
+{
+  Q_D(qSlicerMarkupsModuleWidget);
+  d->createMarkupsButtonsColumns = columns;
+}
+
+//-----------------------------------------------------------------------------
+void qSlicerMarkupsModuleWidget::setMarkup(const QString& markupName,
+                                           qSlicerMarkupsAdditionalWidget* additionalWidget)
+{
+  Q_D(qSlicerMarkupsModuleWidget);
+
+  if (d->registeredMarkupsMap.count(markupName))
+    {
+      qWarning() << Q_FUNC_INFO << "registerMarkupsAdditionalWidget: makup additional widget already registered";
+      return;
+    }
+
+  d->registeredMarkupsMap[markupName] = additionalWidget;
+  d->markupsOrder << markupName;
 }

@@ -21,13 +21,16 @@
 // Slicer includes
 #include "qSlicerAbstractModuleWidget.h"
 
+// Markups widgets include
 #include "qSlicerMarkupsModuleExport.h"
 
 class QItemSelection;
 class QMenu;
 class QModelIndex;
+class QStringList;
 class QTableWidgetItem;
 class QShortcut;
+class qSlicerMarkupsAdditionalWidget;
 class qSlicerMarkupsModuleWidgetPrivate;
 class vtkMRMLMarkupsNode;
 class vtkMRMLNode;
@@ -83,8 +86,15 @@ public:
   /// the slice composite nodes
   bool sliceIntersectionsVisible();
 
+  // Set number of columns for organization of create markups buttons
+  void setCreateMarkupsButtonsColumns(unsigned int columns);
+
   bool setEditedNode(vtkMRMLNode* node, QString role = QString(), QString context = QString()) override;
   double nodeEditable(vtkMRMLNode* node) override;
+
+  /// Register additional widget
+  void setMarkup(const QString& markupsClass,
+                 qSlicerMarkupsAdditionalWidget* additionalWidget = nullptr);
 
 public slots:
 
@@ -119,14 +129,6 @@ public slots:
   void onResetToDefaultDisplayPropertiesPushButtonClicked();
   void onSaveToDefaultDisplayPropertiesPushButtonClicked();
 
-  /// Resample Curve button slot
-  void onApplyCurveResamplingPushButtonClicked();
-
-  /// Change angle mode of current angle markup if combobox selection is made.
-  void onAngleMeasurementModeChanged();
-  /// Update angle measurement rotation axis if the user edits the column vector
-  void onRotationAxisChanged();
-
   /// List button slots
   void onVisibilityOnAllMarkupsInListPushButtonClicked();
   void onVisibilityOffAllMarkupsInListPushButtonClicked();
@@ -153,13 +155,8 @@ public slots:
   /// make sure that a display node is added
   void onActiveMarkupMRMLNodeAdded(vtkMRMLNode *markupsNode);
 
-  void onCreateMarkupsFiducial();
-  void onCreateMarkupsLine();
-  void onCreateMarkupsAngle();
-  void onCreateMarkupsOpenCurve();
-  void onCreateMarkupsClosedCurve();
-  void onCreateMarkupsPlane();
-  void onCreateMarkupsROI();
+  /// Create markup by class.
+  void onCreateMarkupByClass(const QString& className);
 
   /// Toggle the markups node visibility flag
   void onListVisibileInvisiblePushButtonClicked();
@@ -230,12 +227,6 @@ public slots:
 
   /// update the coordinates shown in the table to be either the transformed coordinates (checked) or the untransformed coordinates (unchecked)
   void onTransformedCoordinatesToggled(bool checked);
-
-  /// Change in a widget related to a surface curve type parameter
-  void onCurveTypeParameterChanged();
-
-  /// Change in ROI parameter widget
-  void onROITypeParameterChanged();
 
   /// Make sure all measurements in the current markups node are observed
   void observeMeasurementsInCurrentMarkupsNode();

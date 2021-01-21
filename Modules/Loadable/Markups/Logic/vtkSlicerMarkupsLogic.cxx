@@ -1563,8 +1563,8 @@ vtkMRMLMarkupsJsonStorageNode* vtkSlicerMarkupsLogic::AddNewJsonStorageNodeForMa
 }
 
 //---------------------------------------------------------------------------
-void vtkSlicerMarkupsLogic::RegisterMarkup(vtkMRMLMarkupsNode *markupsNode,
-                                           vtkSlicerMarkupsWidget* markupsWidget)
+void vtkSlicerMarkupsLogic::SetMarkup(vtkMRMLMarkupsNode *markupsNode,
+                                      vtkSlicerMarkupsWidget* markupsWidget)
 {
   if (markupsNode == nullptr)
     {
@@ -1580,28 +1580,41 @@ void vtkSlicerMarkupsLogic::RegisterMarkup(vtkMRMLMarkupsNode *markupsNode,
 
   // Take ownership of widget regardless of the outcome of this function (we will
   // manage the memory).
-  vtkSmartPointer<vtkMRMLNode> node =
-    vtkSmartPointer<vtkMRMLNode>::Take(markupsNode);
+  vtkSmartPointer<vtkMRMLMarkupsNode> node =
+    vtkSmartPointer<vtkMRMLMarkupsNode>::Take(markupsNode);
 
   vtkSmartPointer<vtkSlicerMarkupsWidget> associatedWidget =
     vtkSmartPointer<vtkSlicerMarkupsWidget>::Take(markupsWidget);
 
   // Check that the class is not already registered
-  if (this->MarkupsWidgetsMap.count(markupsNode->GetClassName()))
+  if (this->MarkupsWidgetsMap.count(markupsNode->GetMarkupName()))
     {
-    vtkWarningMacro("RegisterMarkup: Markups node " << markupsNode->GetClassName() <<
+    vtkWarningMacro("RegisterMarkup: Markups node " << markupsNode->GetMarkupName() <<
                     " is already registered.");
     return;
     }
 
-  this->MarkupsWidgetsMap[markupsNode->GetClassName()] = associatedWidget;
+  this->MarkupsWidgetsMap[markupsNode->GetMarkupName()] = associatedWidget;
+  this->MarkupsNodesMap[markupsNode->GetMarkupName()] = node;
 }
 
 //----------------------------------------------------------------------------
-vtkSlicerMarkupsWidget* vtkSlicerMarkupsLogic::GetWidgetByMarkupsNodeClass(const char* markupClass) const
+vtkSlicerMarkupsWidget* vtkSlicerMarkupsLogic::GetWidgetByMarkupsName(const char* markupName) const
 {
-  auto search = this->MarkupsWidgetsMap.find(markupClass);
+  const auto& search = this->MarkupsWidgetsMap.find(markupName);
   if (search != this->MarkupsWidgetsMap.end())
+    {
+    return search->second;
+    }
+
+  return nullptr;
+}
+
+//----------------------------------------------------------------------------
+vtkMRMLMarkupsNode* vtkSlicerMarkupsLogic::GetNodeByMarkupsName(const char* markupName) const
+{
+  const auto& search = this->MarkupsNodesMap.find(markupName);
+  if (search != this->MarkupsNodesMap.end())
     {
     return search->second;
     }

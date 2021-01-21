@@ -250,19 +250,29 @@ public:
   /// manager, UI and subject hierarchy) it needs to be registered using this function.
   /// \param markupsNode MRMLMarkups node to be registered.
   /// \param markupsWidget vtkSlicerWidget associated to the MRMLMarkups node registered.
-  void RegisterMarkup(vtkMRMLMarkupsNode *markupsNode, vtkSlicerMarkupsWidget* markupsWidget);
+  void SetMarkup(vtkMRMLMarkupsNode *markupsNode, vtkSlicerMarkupsWidget* markupsWidget);
 
   /// This returns an isntance to a corresponding vtkSlicerMarkupsWidget associated
-  /// to the MRML node class specified.
+  /// to the indicated markups name.
   /// \param nodeClass registered class to retrieve the associated widget.
   /// \return pointer to associated vtkSLicerMarkupsWidget or nullptr if the MRML node
   /// class is not registered.
-  vtkSlicerMarkupsWidget* GetWidgetByMarkupsNodeClass(const char* className) const;
+  vtkSlicerMarkupsWidget* GetWidgetByMarkupsName(const char* markupName) const;
 
-  /// This returns a constant reference to the regstered markups. This is useful to check what
-  /// are the markups that are regisered.
-  const std::map<std::string, vtkSmartPointer<vtkSlicerMarkupsWidget> >& RegisteredMarkups()const
+  /// This returns an isntance to a corresponding vtkMRMLMarkupsNode associated
+  /// to the indicated markups name.
+  /// \param nodeClass registered class to retrieve the associated widget.
+  /// \return pointer to associated vtkSLicerMarkupsWidget or nullptr if the MRML node
+  /// class is not registered.
+  vtkMRMLMarkupsNode* GetNodeByMarkupsName(const char* markupName) const;
+
+  /// This returns a constant reference to the markups-widgets association map.
+  const std::map<std::string, vtkSmartPointer<vtkSlicerMarkupsWidget> >& GetMarkupsWidgets()const
     {return this->MarkupsWidgetsMap;}
+
+  /// This returns a constant reference to the markups-nodes association map.
+  const std::map<std::string, vtkSmartPointer<vtkMRMLMarkupsNode> >& GetMarkupsNodes()const
+    {return this->MarkupsNodesMap;}
 
 protected:
   vtkSlicerMarkupsLogic();
@@ -284,6 +294,9 @@ protected:
 
   // Keeps track of the registered nodes and corresponding widgets
   std::map<std::string, vtkSmartPointer<vtkSlicerMarkupsWidget> > MarkupsWidgetsMap;
+
+  // Keep track of the registered markup and corresponding mrml markups node
+  std::map<std::string, vtkSmartPointer<vtkMRMLMarkupsNode> > MarkupsNodesMap;
 
 private:
 

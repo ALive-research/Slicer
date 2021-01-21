@@ -179,7 +179,6 @@ qSlicerAbstractModuleRepresentation* qSlicerMarkupsModule::createWidgetRepresent
 {
   // Create and configure module widget.
   qSlicerMarkupsModuleWidget* moduleWidget = new qSlicerMarkupsModuleWidget();
-  moduleWidget->setCreateMarkupsButtonsColumns(6);
 
   // Register markups
   moduleWidget->setMarkup("Fiducial");

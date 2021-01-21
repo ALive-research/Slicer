@@ -239,7 +239,13 @@ double qSlicerSubjectHierarchyMarkupsPlugin::canAddNodeToSubjectHierarchy(
     return 0.0;
     }
 
-  bool registered = markupsLogic->GetWidgetByMarkupsNodeClass(node->GetClassName()) ? true : false;
+  vtkMRMLMarkupsNode* markupsNode= vtkMRMLMarkupsNode::SafeDownCast(node);
+  if (!markupsNode)
+    {
+    return 0.0;
+    }
+
+  bool registered = markupsLogic->GetWidgetByMarkupsName(markupsNode->GetMarkupName()) ? true : false;
   if (registered)
     {
     // Item is a registered markup
@@ -287,7 +293,12 @@ double qSlicerSubjectHierarchyMarkupsPlugin::canOwnSubjectHierarchyItem(vtkIdTyp
     return 0.0;
     }
 
-  bool registered = markupsLogic->GetWidgetByMarkupsNodeClass(associatedNode->GetClassName()) ? true : false;
+  vtkMRMLMarkupsNode* associatedMarkupsNode = vtkMRMLMarkupsNode::SafeDownCast(associatedNode);
+  if (!associatedMarkupsNode)
+    {
+    return 0.0;
+    }
+  bool registered = markupsLogic->GetWidgetByMarkupsName(associatedMarkupsNode->GetMarkupName()) ? true : false;
   if (registered)
     {
     // Item is a registered markup

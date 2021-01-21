@@ -546,13 +546,22 @@ bool vtkMRMLMarkupsDisplayableManager::IsCorrectDisplayableManager()
     vtkErrorMacro ("IsCorrectDisplayableManager: No selection node in the scene.");
     return false;
     }
+  const char* placeNodeClassName = selectionNode->GetActivePlaceNodeClassName();
   if (selectionNode->GetActivePlaceNodeClassName() == nullptr)
     {
     return false;
     }
-  // the purpose of the displayableManager is hardcoded
-  return this->IsManageable(selectionNode->GetActivePlaceNodeClassName());
 
+  vtkSmartPointer<vtkMRMLNode> node;
+  node.TakeReference(this->GetMRMLScene()->CreateNodeByClass(placeNodeClassName));
+  vtkMRMLMarkupsNode* markupsNode = vtkMRMLMarkupsNode::SafeDownCast(node);
+  if (!markupsNode)
+    {
+    return false;
+    }
+
+  // the purpose of the displayableManager is hardcoded
+  return this->IsManageable(markupsNode->GetMarkupName());
 }
 //---------------------------------------------------------------------------
 bool vtkMRMLMarkupsDisplayableManager::IsManageable(vtkMRMLNode* node)
@@ -563,13 +572,21 @@ bool vtkMRMLMarkupsDisplayableManager::IsManageable(vtkMRMLNode* node)
     return false;
     }
 
-  return this->IsManageable(node->GetClassName());
+  vtkMRMLMarkupsNode* markupsNode =
+    vtkMRMLMarkupsNode::SafeDownCast(node);
+  if (!markupsNode)
+    {
+    vtkErrorMacro("Is Manageable: node is not of type vtkMRMLMarkupsNode.");
+    return false;
+    }
+
+  return this->IsManageable(markupsNode->GetMarkupName());
 }
 
 //---------------------------------------------------------------------------
-bool vtkMRMLMarkupsDisplayableManager::IsManageable(const char* nodeClassName)
+bool vtkMRMLMarkupsDisplayableManager::IsManageable(const char* markupName)
 {
-  if (nodeClassName == nullptr)
+  if (markupName == nullptr)
     {
    return false;
     }
@@ -582,7 +599,7 @@ bool vtkMRMLMarkupsDisplayableManager::IsManageable(const char* nodeClassName)
     return false;
     }
 
-  return markupsLogic->GetWidgetByMarkupsNodeClass(nodeClassName) ? true : false;
+  return markupsLogic->GetWidgetByMarkupsName(markupName) ? true : false;
 }
 
 //---------------------------------------------------------------------------
@@ -650,22 +667,36 @@ bool vtkMRMLMarkupsDisplayableManager::CanProcessInteractionEvent(vtkMRMLInterac
       {
       return false;
       }
+
+    const char* placeNodeClassName = selectionNode->GetActivePlaceNodeClassName();
+    if (!placeNodeClassName)
+      {
+      return false;
+      }
+    vtkSmartPointer<vtkMRMLNode> node;
+    node.TakeReference(this->GetMRMLScene()->CreateNodeByClass(placeNodeClassName));
+    vtkMRMLMarkupsNode *markupsNode = vtkMRMLMarkupsNode::SafeDownCast(node);
+    if (!markupsNode)
+      {
+      return false;
+      }
+
     if (interactionNode->GetCurrentInteractionMode() == vtkMRMLInteractionNode::Place
-      && this->IsManageable(selectionNode->GetActivePlaceNodeClassName()))
+      && this->IsManageable(markupsNode->GetMarkupName()))
       {
 
       // If there is a suitable markups node for placement but it is not available in current view
       // then we do not allow placement (placement would create a new markup node for this view,
       // which would probably not what users want - they would like to place using the current markups node)
       bool canPlaceInThisView = false;
-      vtkMRMLMarkupsNode* markupsNode = this->GetActiveMarkupsNodeForPlacement();
-      if (markupsNode)
+      vtkMRMLMarkupsNode* activeMarkupsNode = this->GetActiveMarkupsNodeForPlacement();
+      if (activeMarkupsNode)
         {
-        int numberOfDisplayNodes = markupsNode->GetNumberOfDisplayNodes();
+        int numberOfDisplayNodes = activeMarkupsNode->GetNumberOfDisplayNodes();
         vtkMRMLAbstractViewNode* viewNode = vtkMRMLAbstractViewNode::SafeDownCast(this->GetMRMLDisplayableNode());
         for (int displayNodeIndex = 0; displayNodeIndex < numberOfDisplayNodes; displayNodeIndex++)
           {
-          if (markupsNode->GetNthDisplayNode(displayNodeIndex)->IsDisplayableInView(viewNode->GetID()))
+          if (activeMarkupsNode->GetNthDisplayNode(displayNodeIndex)->IsDisplayableInView(viewNode->GetID()))
             {
             canPlaceInThisView = true;
             break;
@@ -784,20 +815,19 @@ vtkMRMLMarkupsNode* vtkMRMLMarkupsDisplayableManager::GetActiveMarkupsNodeForPla
     {
     return nullptr;
     }
+
   // Additional checks for placement
+  if (!this->IsManageable(markupsNode->GetMarkupName()))
+    {
+    return nullptr;
+    }
+
   const char* placeNodeClassName = selectionNode->GetActivePlaceNodeClassName();
-  if (!placeNodeClassName)
+  if (!placeNodeClassName || std::string(markupsNode->GetClassName()) != placeNodeClassName)
     {
     return nullptr;
     }
-  if (!this->IsManageable(placeNodeClassName))
-    {
-    return nullptr;
-    }
-  if (std::string(markupsNode->GetClassName()) != placeNodeClassName)
-    {
-    return nullptr;
-    }
+
   return markupsNode;
 }
 
@@ -824,8 +854,17 @@ vtkSlicerMarkupsWidget* vtkMRMLMarkupsDisplayableManager::GetWidgetForPlacement(
     {
     return nullptr;
     }
-  std::string placeNodeClassName = (selectionNode->GetActivePlaceNodeClassName() ? selectionNode->GetActivePlaceNodeClassName() : nullptr);
-  if (!this->IsManageable(placeNodeClassName.c_str()))
+
+
+  const char* placeNodeClassName = selectionNode->GetActivePlaceNodeClassName();
+  if (!placeNodeClassName)
+    {
+    return nullptr;
+    }
+  vtkSmartPointer<vtkMRMLNode> node;
+  node.TakeReference(this->GetMRMLScene()->CreateNodeByClass(placeNodeClassName));
+  vtkMRMLMarkupsNode *markupsNode = vtkMRMLMarkupsNode::SafeDownCast(node);
+  if (!markupsNode || !this->IsManageable(markupsNode->GetMarkupName()))
     {
     return nullptr;
     }
@@ -941,7 +980,7 @@ vtkSlicerMarkupsWidget * vtkMRMLMarkupsDisplayableManager::CreateWidget(vtkMRMLM
   // Create a widget of the associated type if the node matches the registered nodes
   vtkSlicerMarkupsWidget* widget =
     vtkSlicerMarkupsWidget::SafeDownCast(
-      markupsLogic->GetWidgetByMarkupsNodeClass(markupsNode->GetClassName())
+      markupsLogic->GetWidgetByMarkupsName(markupsNode->GetMarkupName())
     )->CreateInstance();
 
 

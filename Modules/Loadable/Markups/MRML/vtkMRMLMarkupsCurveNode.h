@@ -108,7 +108,7 @@ public:
   const char* GetMarkupName() override {return "Curve";};
 
   /// Get markup short name
-  const char* GetMarkupShortName() override {return "C";};
+  const char* GetMarkupShortName() override {return "OC";};
 
   /// Read node attributes from XML file
   void ReadXMLAttributes( const char** atts) override;

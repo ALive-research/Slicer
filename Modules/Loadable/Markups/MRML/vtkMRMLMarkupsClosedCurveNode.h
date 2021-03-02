@@ -54,7 +54,7 @@ public:
   const char* GetMarkupName() override {return "ClosedCurve";};
 
   /// Get markup short name
-  const char* GetMarkupShortName() override {return "C";};
+  const char* GetMarkupShortName() override {return "CC";};
 
   /// Copy node content (excludes basic data, such as name and node references).
   /// \sa vtkMRMLNode::CopyContent

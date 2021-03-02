@@ -608,7 +608,9 @@ vtkMRMLMarkupsNode* vtkMRMLMarkupsDisplayableManager::CreateNewMarkupsNode(
 {
   vtkMRMLMarkupsNode* markupsNode = vtkMRMLMarkupsNode::SafeDownCast(
     this->GetMRMLScene()->AddNewNodeByClass(markupsNodeClassName));
-  std::string nodeName = this->GetMRMLScene()->GenerateUniqueName(markupsNode->GetMarkupShortName());
+
+  std::string nodeName =
+    this->GetMRMLScene()->GenerateUniqueName(markupsNode->GetMarkupShortName());
   markupsNode->SetName(nodeName.c_str());
   markupsNode->AddDefaultStorageNode();
   markupsNode->CreateDefaultDisplayNodes();

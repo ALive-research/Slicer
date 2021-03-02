@@ -1548,7 +1548,19 @@ void qSlicerMarkupsModuleWidget::onCreateMarkupByClass(const QString& className)
 {
   if (this->mrmlScene())
     {
-    this->onActiveMarkupMRMLNodeAdded(this->mrmlScene()->AddNewNodeByClass(className.toStdString().c_str()));
+      vtkMRMLNode* node = this->mrmlScene()->AddNewNodeByClass(className.toStdString().c_str());
+      vtkMRMLMarkupsNode* markupsNode = vtkMRMLMarkupsNode::SafeDownCast(node);
+
+      if (!markupsNode)
+      {
+        qCritical() << Q_FUNC_INFO << ": node added is not a vtkMRMLMarkupsNode.";
+        return;
+      }
+
+      std::string nodeName =
+        this->mrmlScene()->GenerateUniqueName(markupsNode->GetMarkupShortName());
+      markupsNode->SetName(nodeName.c_str());
+      this->onActiveMarkupMRMLNodeAdded(markupsNode);
     }
 }
 
